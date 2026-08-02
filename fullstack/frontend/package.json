@@ -1,0 +1,24 @@
+{
+  "name": "osint-ci-tool-frontend",
+  "version": "3.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev":     "vite",
+    "build":   "vite build",
+    "preview": "vite preview",
+    "lint":    "eslint src --ext .js,.jsx"
+  },
+  "dependencies": {
+    "react":     "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.3.4",
+    "eslint":               "^9.9.0",
+    "vite":                 "^6.0.5"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}
