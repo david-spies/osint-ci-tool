@@ -1,0 +1,724 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>OSINT-CI-TOOL | Multi-LLM Psychometric Scorer</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&family=Space+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --c-bg:         #0a0c10;
+      --c-surface:    #0f1318;
+      --c-surface2:   #151a22;
+      --c-border:     rgba(0,255,136,0.12);
+      --c-border2:    rgba(0,255,136,0.06);
+      --c-green:      #00ff88;
+      --c-green-dim:  rgba(0,255,136,0.7);
+      --c-green-bg:   rgba(0,255,136,0.06);
+      --c-blue:       #4488ff;
+      --c-purple:     #a855f7;
+      --c-amber:      #ffb84d;
+      --c-red:        #ff4466;
+      --c-text:       #e0e6f0;
+      --c-muted:      #6b7a94;
+      --c-muted2:     #3d4a5c;
+      --font-mono:    'JetBrains Mono', monospace;
+      --font-sans:    'Space Grotesk', sans-serif;
+    }
+
+    html, body { background: var(--c-bg); color: var(--c-text); font-family: var(--font-sans); min-height: 100vh; }
+
+    .app     { max-width: 900px; margin: 0 auto; padding: 2rem 1.5rem; }
+    .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0,0,0,0); }
+
+    /* Header */
+    .header      { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 2rem; padding-bottom: 1.5rem; border-bottom: 0.5px solid var(--c-border); }
+    .logo-line   { display: flex; align-items: center; gap: 10px; margin-bottom: 4px; }
+    .logo-mark   { width: 28px; height: 28px; border: 1.5px solid var(--c-green); border-radius: 4px; display: flex; align-items: center; justify-content: center; font-family: var(--font-mono); font-size: 12px; color: var(--c-green); font-weight: 700; letter-spacing: -1px; }
+    .logo-title  { font-family: var(--font-mono); font-size: 18px; font-weight: 700; color: var(--c-green); letter-spacing: 0.05em; }
+    .logo-sub    { font-family: var(--font-mono); font-size: 11px; color: var(--c-muted); letter-spacing: 0.1em; text-transform: uppercase; margin-left: 38px; }
+    .status-pill { display: flex; align-items: center; gap: 6px; padding: 5px 12px; background: var(--c-green-bg); border: 0.5px solid var(--c-border); border-radius: 20px; font-family: var(--font-mono); font-size: 10px; color: var(--c-green-dim); letter-spacing: 0.05em; white-space: nowrap; }
+    .status-dot  { width: 6px; height: 6px; background: var(--c-green); border-radius: 50%; animation: pulse 2s ease-in-out infinite; }
+
+    /* Config Panel */
+    .config-panel { background: var(--c-surface); border: 0.5px solid var(--c-border2); border-radius: 12px; padding: 1.25rem 1.5rem; margin-bottom: 1rem; display: flex; flex-direction: column; gap: 1rem; }
+    .config-row   { display: flex; gap: 1rem; width: 100%; align-items: flex-end; }
+    .config-field { flex: 1; }
+    .config-field label { display: block; font-family: var(--font-mono); font-size: 9px; text-transform: uppercase; letter-spacing: 0.12em; color: var(--c-muted); margin-bottom: 6px; }
+    .config-field input,
+    .config-field select { width: 100%; background: var(--c-surface2); border: 0.5px solid rgba(255,255,255,0.06); border-radius: 6px; padding: 9px 12px; font-family: var(--font-mono); font-size: 12px; color: var(--c-text); outline: none; transition: border-color .2s; appearance: none; -webkit-appearance: none; }
+    .config-field input::placeholder { color: var(--c-muted2); }
+    .config-field input:focus,
+    .config-field select:focus { border-color: rgba(0,255,136,0.25); }
+    .config-note { font-family: var(--font-mono); font-size: 9px; color: var(--c-muted2); line-height: 1.6; }
+
+    /* Input Panel */
+    .input-panel { background: var(--c-surface); border: 0.5px solid var(--c-border2); border-radius: 12px; padding: 1.5rem; margin-bottom: 1.25rem; }
+    .panel-label { font-family: var(--font-mono); font-size: 10px; color: var(--c-muted); text-transform: uppercase; letter-spacing: 0.12em; margin-bottom: 10px; display: flex; align-items: center; gap: 8px; }
+    .panel-label::before { content: ''; display: inline-block; width: 6px; height: 6px; border-left: 1.5px solid var(--c-green); border-bottom: 1.5px solid var(--c-green); }
+    textarea { width: 100%; background: var(--c-surface2); border: 0.5px solid rgba(255,255,255,0.06); border-radius: 8px; padding: 14px; font-family: var(--font-mono); font-size: 12px; color: var(--c-text); resize: vertical; outline: none; line-height: 1.6; transition: border-color .2s; min-height: 140px; }
+    textarea::placeholder { color: var(--c-muted2); }
+    textarea:focus { border-color: rgba(0,255,136,0.25); }
+
+    /* Execute Button */
+    .exec-btn { width: 100%; margin-top: 12px; padding: 14px; background: transparent; border: 1px solid var(--c-green); border-radius: 8px; color: var(--c-green); font-family: var(--font-mono); font-size: 12px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; cursor: pointer; transition: background .2s; }
+    .exec-btn:hover:not(:disabled) { background: var(--c-green-bg); }
+    .exec-btn:disabled { border-color: var(--c-muted2); color: var(--c-muted); cursor: not-allowed; }
+    .btn-inner { display: flex; align-items: center; justify-content: center; gap: 8px; }
+    .spinner   { width: 14px; height: 14px; border: 1.5px solid var(--c-muted); border-top-color: var(--c-green); border-radius: 50%; animation: spin .8s linear infinite; flex-shrink: 0; }
+
+    /* Error Box */
+    .error-box { background: rgba(255,68,102,0.07); border: 0.5px solid rgba(255,68,102,0.2); border-radius: 8px; padding: 12px 16px; font-family: var(--font-mono); font-size: 12px; color: var(--c-red); margin-top: 12px; display: none; line-height: 1.5; }
+
+    /* Section Divider */
+    .section-divider { display: flex; align-items: center; gap: 12px; margin: 1.5rem 0 1.25rem; }
+    .divider-label   { font-family: var(--font-mono); font-size: 10px; color: var(--c-muted); text-transform: uppercase; letter-spacing: 0.12em; white-space: nowrap; }
+    .divider-line    { flex: 1; height: 0.5px; background: var(--c-border2); }
+
+    /* Results */
+    .results-section { display: none; animation: fadeUp .4s ease; }
+
+    /* Primary Score Card */
+    .primary-score-card  { background: var(--c-surface); border: 0.5px solid var(--c-border); border-radius: 12px; padding: 1.5rem; display: grid; grid-template-columns: auto 1fr; gap: 2rem; align-items: center; }
+    .score-dial          { text-align: center; min-width: 120px; }
+    .score-number        { font-family: var(--font-mono); font-size: 52px; font-weight: 700; line-height: 1; color: var(--c-green); }
+    .score-label         { font-family: var(--font-mono); font-size: 9px; color: var(--c-muted); text-transform: uppercase; letter-spacing: 0.12em; margin-top: 4px; }
+    .score-bar-container { height: 3px; background: rgba(255,255,255,0.06); border-radius: 2px; margin-top: 8px; overflow: hidden; }
+    .score-bar-fill      { height: 100%; border-radius: 2px; width: 0%; transition: width 1s cubic-bezier(.4,0,.2,1); }
+    .justification       { font-size: 13px; color: var(--c-muted); line-height: 1.65; font-style: italic; border-left: 2px solid var(--c-green); padding-left: 14px; }
+
+    /* Threat Badges */
+    .threat-level { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border-radius: 4px; font-family: var(--font-mono); font-size: 10px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; margin-top: 8px; }
+    .tl-low   { background: rgba(0,255,136,0.08);  color: var(--c-green); border: 0.5px solid rgba(0,255,136,0.2); }
+    .tl-med   { background: rgba(255,184,77,0.08); color: var(--c-amber); border: 0.5px solid rgba(255,184,77,0.2); }
+    .tl-high  { background: rgba(255,68,102,0.08); color: var(--c-red);   border: 0.5px solid rgba(255,68,102,0.2); }
+    .tl-vhigh { background: rgba(255,68,102,0.12); color: #ff6680;        border: 0.5px solid rgba(255,68,102,0.3); }
+
+    /* Framework Grid */
+    .framework-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 10px; }
+    .fw-card        { background: var(--c-surface); border: 0.5px solid var(--c-border2); border-radius: 10px; padding: 1rem; position: relative; overflow: hidden; }
+    .fw-card::after { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px; }
+    .fw-card.blue::after   { background: var(--c-blue); }
+    .fw-card.purple::after { background: var(--c-purple); }
+    .fw-card.amber::after  { background: var(--c-amber); }
+    .fw-title       { font-family: var(--font-mono); font-size: 9px; color: var(--c-muted); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 8px; line-height: 1.4; }
+    .fw-score       { font-family: var(--font-mono); font-size: 28px; font-weight: 700; line-height: 1; }
+    .fw-score.blue   { color: var(--c-blue); }
+    .fw-score.purple { color: var(--c-purple); }
+    .fw-score.amber  { color: var(--c-amber); }
+    .fw-suffix      { font-size: 14px; color: var(--c-muted); font-weight: 400; }
+    .fw-weight-line { margin-top: 10px; padding-top: 10px; border-top: 0.5px solid rgba(255,255,255,0.05); display: flex; justify-content: space-between; align-items: center; }
+    .fw-weight-label{ font-family: var(--font-mono); font-size: 9px; color: var(--c-muted2); }
+    .fw-weight-val  { font-family: var(--font-mono); font-size: 11px; font-weight: 600; }
+    .fw-weight-val.blue   { color: var(--c-blue); }
+    .fw-weight-val.purple { color: var(--c-purple); }
+    .fw-weight-val.amber  { color: var(--c-amber); }
+
+    /* Traits Panel */
+    .traits-panel      { background: var(--c-surface); border: 0.5px solid var(--c-border2); border-radius: 12px; padding: 1.25rem; }
+    .traits-grid       { display: grid; grid-template-columns: repeat(4,1fr); gap: 8px; margin-bottom: 1.25rem; }
+    .trait-cell        { background: var(--c-surface2); border: 0.5px solid rgba(255,255,255,0.04); border-radius: 8px; padding: 12px 10px; text-align: center; }
+    .trait-name        { font-family: var(--font-mono); font-size: 8px; color: var(--c-muted2); text-transform: uppercase; letter-spacing: 0.08em; display: block; margin-bottom: 6px; line-height: 1.4; }
+    .trait-val         { font-family: var(--font-mono); font-size: 20px; font-weight: 700; color: var(--c-text); display: block; }
+    .trait-val.hi      { color: var(--c-green); }
+    .sub-row           { display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem; }
+    .sub-section-label { font-family: var(--font-mono); font-size: 9px; color: var(--c-muted); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 8px; }
+    .intel-tags        { display: flex; flex-wrap: wrap; gap: 6px; }
+    .intel-tag         { font-family: var(--font-mono); font-size: 10px; color: var(--c-muted); background: var(--c-surface2); border: 0.5px solid rgba(255,255,255,0.08); border-radius: 4px; padding: 4px 10px; }
+    .tells-list        { list-style: none; }
+    .tells-list li     { font-size: 12px; color: #9baab8; padding: 5px 0; display: flex; gap: 8px; align-items: flex-start; border-bottom: 0.5px solid rgba(255,255,255,0.03); line-height: 1.5; }
+    .tells-list li:last-child { border-bottom: none; }
+    .tell-arrow        { color: var(--c-green); font-size: 9px; margin-top: 4px; flex-shrink: 0; }
+
+    /* Scan Line */
+    .scan-line        { position: fixed; top: 0; left: 0; right: 0; height: 1px; background: linear-gradient(90deg, transparent, var(--c-green), transparent); opacity: 0; pointer-events: none; z-index: 999; }
+    .scan-line.active { opacity: 0.4; animation: scanDown 2s linear infinite; }
+
+    /* Keyframes */
+    @keyframes pulse    { 0%,100%{opacity:1}50%{opacity:.3} }
+    @keyframes spin     { to{transform:rotate(360deg)} }
+    @keyframes fadeUp   { from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)} }
+    @keyframes scanDown { from{top:0}to{top:100vh} }
+
+    /* Responsive */
+    @media (max-width: 640px) {
+      .config-row         { flex-direction: column; align-items: stretch; }
+      .framework-grid     { grid-template-columns: 1fr; }
+      .traits-grid        { grid-template-columns: repeat(2,1fr); }
+      .sub-row            { grid-template-columns: 1fr; }
+      .primary-score-card { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="scan-line" id="scanLine"></div>
+  <div class="app">
+    <h1 class="sr-only">OSINT-CI-TOOL — Multi-Model IC Psychometric Scorer</h1>
+
+    <!-- Header -->
+    <header class="header">
+      <div>
+        <div class="logo-line">
+          <div class="logo-mark">CI</div>
+          <span class="logo-title">OSINT-CI-TOOL</span>
+        </div>
+        <div class="logo-sub">Multi-Model Psychometric Analytics Engine &nbsp;·&nbsp; v3.1.0</div>
+      </div>
+      <div class="status-pill">
+        <span class="status-dot"></span>
+        MATRIX SYSTEM OPERATIONAL
+      </div>
+    </header>
+
+    <!-- Config Panel -->
+    <div class="config-panel">
+      <div class="config-row">
+        <div class="config-field" style="max-width:220px;">
+          <label for="vendorSelect">Model Family Provider</label>
+          <select id="vendorSelect" onchange="onVendorChange()"></select>
+        </div>
+        <div class="config-field">
+          <label for="modelSelect">Target Model Engine</label>
+          <select id="modelSelect"></select>
+        </div>
+      </div>
+      <div class="config-row">
+        <div class="config-field">
+          <label for="apiKey">API Authorization Token</label>
+          <input type="password" id="apiKey" placeholder="Paste credential token for the selected provider..." autocomplete="off" />
+        </div>
+      </div>
+      <p class="config-note">
+        🔑 Credentials run securely inside your browser session and are never transmitted to any third-party server.
+        Anthropic requires the <code>anthropic-dangerous-direct-browser-access</code> header for browser CORS — included automatically.
+        Google Gemini keys are passed as a URL query parameter per the REST spec.
+        OpenAI, DeepSeek, and Kimi use standard Bearer token auth.
+      </p>
+    </div>
+
+    <!-- Input Panel -->
+    <div class="input-panel">
+      <div class="panel-label">Target Profile Dataset (LinkedIn Raw Text)</div>
+      <textarea id="profileInput" rows="8" placeholder="Paste unstructured corporate footprint, military components, security indicators, and academic history — About, Experience, Skills, and Education sections..."></textarea>
+      <button class="exec-btn" id="execBtn" onclick="runAnalysis()">
+        <div class="btn-inner" id="btnInner">
+          <span>▶ &nbsp;Execute Multi-Engine Behavioral Diagnostics</span>
+        </div>
+      </button>
+      <div class="error-box" id="errorBox"></div>
+    </div>
+
+    <!-- Results -->
+    <div class="results-section" id="resultsSection">
+
+      <div class="section-divider">
+        <span class="divider-label">IC Proximity Analysis</span>
+        <div class="divider-line"></div>
+      </div>
+
+      <div class="primary-score-card">
+        <div class="score-dial">
+          <div class="score-number" id="scoreNum">--</div>
+          <div class="score-bar-container" style="width:110px;margin:8px auto 0;">
+            <div class="score-bar-fill" id="scoreBar"></div>
+          </div>
+          <div class="score-label">IC Proximity Index</div>
+          <div id="threatLevelContainer"></div>
+        </div>
+        <p class="justification" id="justText">—</p>
+      </div>
+
+      <div class="section-divider">
+        <span class="divider-label">Framework Vector Analysis</span>
+        <div class="divider-line"></div>
+      </div>
+
+      <div class="framework-grid">
+        <div class="fw-card blue">
+          <div class="fw-title">MICE &amp; Rascal<br>Matrix</div>
+          <div class="fw-score blue"><span id="miceScore">0</span><span class="fw-suffix">/100</span></div>
+          <div class="fw-weight-line">
+            <span class="fw-weight-label">Attribution weight</span>
+            <span class="fw-weight-val blue" id="miceWeight">0%</span>
+          </div>
+        </div>
+        <div class="fw-card purple">
+          <div class="fw-title">Analytic Rigor &amp;<br>Cognitive Style Scale</div>
+          <div class="fw-score purple"><span id="rigorScore">0</span><span class="fw-suffix">/100</span></div>
+          <div class="fw-weight-line">
+            <span class="fw-weight-label">Attribution weight</span>
+            <span class="fw-weight-val purple" id="rigorWeight">0%</span>
+          </div>
+        </div>
+        <div class="fw-card amber">
+          <div class="fw-title">OPSEC Obfuscation<br>vs. "Leaky" Persona</div>
+          <div class="fw-score amber"><span id="opsecScore">0</span><span class="fw-suffix">/100</span></div>
+          <div class="fw-weight-line">
+            <span class="fw-weight-label">Attribution weight</span>
+            <span class="fw-weight-val amber" id="opsecWeight">0%</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="section-divider">
+        <span class="divider-label">Psychometric Signature Profile</span>
+        <div class="divider-line"></div>
+      </div>
+
+      <div class="traits-panel">
+        <div class="traits-grid">
+          <div class="trait-cell">
+            <span class="trait-name">Openness / Intellect</span>
+            <span class="trait-val" id="tOpenness">—</span>
+          </div>
+          <div class="trait-cell">
+            <span class="trait-name">Conscientiousness</span>
+            <span class="trait-val" id="tConscientious">—</span>
+          </div>
+          <div class="trait-cell">
+            <span class="trait-name">Emotional Stability</span>
+            <span class="trait-val" id="tStability">—</span>
+          </div>
+          <div class="trait-cell">
+            <span class="trait-name">Cognitive Complexity</span>
+            <span class="trait-val hi" id="tComplexity">—</span>
+          </div>
+        </div>
+        <div class="sub-row">
+          <div>
+            <div class="sub-section-label">Dominant Intelligence Profiles</div>
+            <div class="intel-tags" id="intelTags"></div>
+          </div>
+          <div>
+            <div class="sub-section-label">Behavioral &amp; Linguistic Tells</div>
+            <ul class="tells-list" id="tellsList"></ul>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /results -->
+  </div><!-- /app -->
+
+  <script>
+    /* ================================================================
+       OSINT-CI-TOOL  |  Standalone Multi-LLM Build  |  v3.1.0
+       Model registry verified against first-party provider documentation
+       as of July 30, 2026.
+
+       Provider Protocols
+       ──────────────────
+       'anthropic' → Anthropic Messages API  (x-api-key header)
+       'gemini'    → Google generateContent REST  (API key as query param)
+       'openai'    → OpenAI Chat Completions shape  (Bearer token)
+                     also used by DeepSeek and Kimi (OpenAI-compatible)
+    ================================================================ */
+
+    const MODEL_REGISTRY = {
+
+      // ── Anthropic ───────────────────────────────────────────────
+      // Source: https://platform.claude.com/docs/en/about-claude/models/overview
+      // Verified: 2026-07-30
+      anthropic: {
+        label:    'Anthropic  (Claude)',
+        endpoint: 'https://api.anthropic.com/v1/messages',
+        protocol: 'anthropic',
+        models: [
+          { id: 'claude-opus-4-7',          name: 'Claude Opus 4.7',        badge: 'LATEST'    },
+          { id: 'claude-sonnet-4-6',         name: 'Claude Sonnet 4.6',      badge: null        },
+          { id: 'claude-opus-4-20250514',    name: 'Claude Opus 4',          badge: null        },
+          { id: 'claude-sonnet-4-20250514',  name: 'Claude Sonnet 4',        badge: null        },
+          { id: 'claude-haiku-4-5-20251001', name: 'Claude Haiku 4.5',       badge: 'FAST'      },
+        ]
+      },
+
+      // ── OpenAI ──────────────────────────────────────────────────
+      // Source: https://platform.openai.com/docs/models
+      // Current flagship family: GPT-5.6 (Sol / Terra / Luna)
+      // GPT-4.1 remains active in API per OpenAI changelog
+      // Verified: 2026-07-30
+      openai: {
+        label:    'OpenAI  (GPT)',
+        endpoint: 'https://api.openai.com/v1/chat/completions',
+        protocol: 'openai',
+        models: [
+          { id: 'gpt-5.6-sol',   name: 'GPT-5.6 Sol   (Flagship)',   badge: 'LATEST'    },
+          { id: 'gpt-5.6-terra', name: 'GPT-5.6 Terra (Balanced)',   badge: null        },
+          { id: 'gpt-5.6-luna',  name: 'GPT-5.6 Luna  (Economy)',    badge: 'FAST'      },
+          { id: 'gpt-4.1',       name: 'GPT-4.1',                    badge: null        },
+          { id: 'gpt-4.1-mini',  name: 'GPT-4.1 mini',               badge: null        },
+        ]
+      },
+
+      // ── Google Gemini ────────────────────────────────────────────
+      // Source: https://ai.google.dev/gemini-api/docs/models
+      // Endpoint: model ID is interpolated into the URL at request time
+      // Gemini 3.6 Flash is current stable flagship (July 2026)
+      // Gemini 2.5 Pro / Flash remain active for complex reasoning
+      // Verified: 2026-07-30
+      google: {
+        label:    'Google  (Gemini)',
+        endpoint: 'https://generativelanguage.googleapis.com/v1beta/models/',
+        protocol: 'gemini',
+        models: [
+          { id: 'gemini-3.6-flash', name: 'Gemini 3.6 Flash',    badge: 'LATEST'    },
+          { id: 'gemini-3.5-flash', name: 'Gemini 3.5 Flash',    badge: null        },
+          { id: 'gemini-2.5-pro',   name: 'Gemini 2.5 Pro',      badge: 'REASONING' },
+          { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash',    badge: 'FAST'      },
+        ]
+      },
+
+      // ── DeepSeek ─────────────────────────────────────────────────
+      // Source: https://api-docs.deepseek.com/updates/
+      // V4 Pro and V4 Flash are the only active official IDs as of July 28, 2026.
+      // Legacy deepseek-chat / deepseek-reasoner retired July 24, 2026.
+      // OpenAI-compatible Chat Completions endpoint.
+      // Verified: 2026-07-30
+      deepseek: {
+        label:    'DeepSeek  (V4)',
+        endpoint: 'https://api.deepseek.com/v1/chat/completions',
+        protocol: 'openai',
+        models: [
+          { id: 'deepseek-v4-pro',   name: 'DeepSeek V4 Pro',     badge: 'LATEST'    },
+          { id: 'deepseek-v4-flash', name: 'DeepSeek V4 Flash',    badge: 'FAST'      },
+        ]
+      },
+
+      // ── Moonshot AI (Kimi) ────────────────────────────────────────
+      // Source: https://platform.kimi.ai/docs/models
+      // kimi-k3: flagship 2.8T param model, 1M context, launched July 16, 2026
+      // kimi-k2.7-code: coding-specialist in K2 family
+      // kimi-k2.6: previous-gen agentic model
+      // moonshot-v1-128k: legacy long-context chat model (still active)
+      // kimi-latest / kimi-k2 series: discontinued
+      // OpenAI-compatible Chat Completions endpoint.
+      // Verified: 2026-07-30
+      kimi: {
+        label:    'Moonshot AI  (Kimi)',
+        endpoint: 'https://api.moonshot.ai/v1/chat/completions',
+        protocol: 'openai',
+        models: [
+          { id: 'kimi-k3',          name: 'Kimi K3  (2.8T, 1M ctx)',  badge: 'LATEST' },
+          { id: 'kimi-k2.7-code',   name: 'Kimi K2.7 Code',           badge: 'CODE'   },
+          { id: 'kimi-k2.6',        name: 'Kimi K2.6',                badge: null     },
+          { id: 'moonshot-v1-128k', name: 'Moonshot V1 128K',          badge: null     },
+        ]
+      },
+
+    };
+
+    /* ── Master Prompt Matrix ─────────────────────────────────────
+       Kept identical across all providers so results are comparable.
+    ─────────────────────────────────────────────────────────────── */
+    const MASTER_PROMPT = `You are an advanced AI behavioral psychologist and OSINT automation engineer specializing in vetting personnel for the intelligence community (IC). Your task is to analyze raw text and metadata from a LinkedIn profile and output a structured JSON payload containing a probabilistic likelihood score (1-100) of the individual's involvement in, or deep proximity to, the intelligence community.
+
+PSYCHOLOGICAL EVALUATION FRAMEWORKS TO IMPLEMENT:
+
+1. The MICE & Rascal Framework (Weight: Dynamic):
+   - Assess motivations and vulnerabilities. Look for ego/status-seeking behavior (grandiose project descriptions with vague scopes), ideological alignment to national security, signs of institutional restlessness (frequent lateral shifts between boutique defense contractors), and keywords like clearance, classified, program, mission, compartmented, or national security.
+
+2. The Analytic Rigor & Cognitive Style Scale (Weight: Dynamic):
+   - Map profile text against high General Intelligence (g), high Openness (intellect facet), and high Conscientiousness. Look for linguistic markers of Structured Analytic Techniques (SATs): conditional hedging language (likely, probable, assessed, indicates), structured reasoning patterns, quantification of uncertainty, strong logical-mathematical or linguistic intelligence patterns, and academic or policy-oriented language complexity.
+
+3. The OPSEC Obfuscation vs. "Leaky" Persona Model (Weight: Dynamic):
+   - Analyze the tension between professional networking and operational security. Look for "Anomalous Anonymity" (vague job titles like "Program Analyst" or "Advisor" with zero task specifics at defense or government agencies), heavy institutional jargon density (SIGINT, HUMINT, OSINT, ISR, C4ISR, GEOINT, all-source), "leaky" markers where high-level technical skills contradict a vague corporate title, mentions of 5-eyes partners or allied intelligence agencies, and education at IC pipeline institutions (Georgetown MSFS, National Intelligence University, NDU, SAIS, Fletcher).
+
+SCORING LOGIC & DYNAMIC WEIGHTING:
+- Assign a specific weight percentage to each of the three models based on what signals are most evident in the profile. Total weights must equal exactly 100.
+- Calculate an overall probability score from 1 to 100.
+- Extract Big Five personality inferences based on text syntax, word choice, and structure.
+- Be precise and analytical. Commit to specific numbers. Do not hedge.
+
+OUTPUT FORMAT: Respond with ONLY a valid JSON object — no markdown, no code fences, no preamble. Match this schema exactly:
+{
+  "overallProbability": 0,
+  "frameworkWeighting": {
+    "miceRascalWeight": 0,
+    "analyticRigorWeight": 0,
+    "opsecLeakyWeight": 0
+  },
+  "frameworkScores": {
+    "miceRascalScore": 0,
+    "analyticRigorScore": 0,
+    "opsecLeakyScore": 0
+  },
+  "psychologicalTraits": {
+    "opennessIntellect": 0,
+    "conscientiousness": 0,
+    "emotionalStability": 0,
+    "cognitiveComplexity": "High"
+  },
+  "intelligenceTypesDetected": [],
+  "behavioralTells": [],
+  "justificationSummary": ""
+}`;
+
+    /* ── Gemini Structured Output Schema ──────────────────────────
+       Passed as responseSchema to enforce JSON structure natively.
+    ─────────────────────────────────────────────────────────────── */
+    const GEMINI_SCHEMA = {
+      type: "OBJECT",
+      properties: {
+        overallProbability: { type: "INTEGER" },
+        frameworkWeighting: {
+          type: "OBJECT",
+          properties: {
+            miceRascalWeight:    { type: "INTEGER" },
+            analyticRigorWeight: { type: "INTEGER" },
+            opsecLeakyWeight:    { type: "INTEGER" }
+          },
+          required: ["miceRascalWeight","analyticRigorWeight","opsecLeakyWeight"]
+        },
+        frameworkScores: {
+          type: "OBJECT",
+          properties: {
+            miceRascalScore:    { type: "INTEGER" },
+            analyticRigorScore: { type: "INTEGER" },
+            opsecLeakyScore:    { type: "INTEGER" }
+          },
+          required: ["miceRascalScore","analyticRigorScore","opsecLeakyScore"]
+        },
+        psychologicalTraits: {
+          type: "OBJECT",
+          properties: {
+            opennessIntellect:   { type: "INTEGER" },
+            conscientiousness:   { type: "INTEGER" },
+            emotionalStability:  { type: "INTEGER" },
+            cognitiveComplexity: { type: "STRING"  }
+          },
+          required: ["opennessIntellect","conscientiousness","emotionalStability","cognitiveComplexity"]
+        },
+        intelligenceTypesDetected: { type: "ARRAY", items: { type: "STRING" } },
+        behavioralTells:           { type: "ARRAY", items: { type: "STRING" } },
+        justificationSummary:      { type: "STRING" }
+      },
+      required: [
+        "overallProbability","frameworkWeighting","frameworkScores",
+        "psychologicalTraits","intelligenceTypesDetected","behavioralTells","justificationSummary"
+      ]
+    };
+
+    /* ── UI Bootstrap ─────────────────────────────────────────────*/
+    function buildVendorDropdown() {
+      const sel = document.getElementById('vendorSelect');
+      sel.innerHTML = '';
+      Object.keys(MODEL_REGISTRY).forEach(key => {
+        const opt = document.createElement('option');
+        opt.value       = key;
+        opt.textContent = MODEL_REGISTRY[key].label;
+        sel.appendChild(opt);
+      });
+    }
+
+    function onVendorChange() {
+      const vendor = document.getElementById('vendorSelect').value;
+      const sel    = document.getElementById('modelSelect');
+      sel.innerHTML = '';
+      MODEL_REGISTRY[vendor].models.forEach(m => {
+        const opt = document.createElement('option');
+        opt.value       = m.id;
+        opt.textContent = m.badge ? `${m.name}  [${m.badge}]` : m.name;
+        sel.appendChild(opt);
+      });
+      document.getElementById('errorBox').style.display = 'none';
+    }
+
+    /* ── Utility Helpers ──────────────────────────────────────────*/
+    function getThreatLevel(score) {
+      if (score >= 75) return { label: 'Very High IC Proximity', cls: 'tl-vhigh' };
+      if (score >= 55) return { label: 'High IC Proximity',      cls: 'tl-high'  };
+      if (score >= 35) return { label: 'Moderate IC Proximity',  cls: 'tl-med'   };
+      return              { label: 'Low IC Proximity',           cls: 'tl-low'   };
+    }
+
+    function getScoreColor(score) {
+      if (score >= 75) return '#ff4466';
+      if (score >= 55) return '#ffb84d';
+      if (score >= 35) return '#4488ff';
+      return '#00ff88';
+    }
+
+    function showError(msg) {
+      const box = document.getElementById('errorBox');
+      box.textContent  = '⚠  ' + msg;
+      box.style.display = 'block';
+    }
+
+    function setLoading(on) {
+      const btn   = document.getElementById('execBtn');
+      const inner = document.getElementById('btnInner');
+      const scan  = document.getElementById('scanLine');
+      btn.disabled    = on;
+      inner.innerHTML = on
+        ? '<span class="spinner"></span><span>Analyzing via Matrix Routing...</span>'
+        : '<span>▶ &nbsp;Execute Multi-Engine Behavioral Diagnostics</span>';
+      on ? scan.classList.add('active') : scan.classList.remove('active');
+    }
+
+    /* ── Main Analysis ────────────────────────────────────────────*/
+    async function runAnalysis() {
+      document.getElementById('errorBox').style.display = 'none';
+
+      const vendor   = document.getElementById('vendorSelect').value;
+      const model    = document.getElementById('modelSelect').value;
+      const apiKey   = document.getElementById('apiKey').value.trim();
+      const text     = document.getElementById('profileInput').value.trim();
+      const provider = MODEL_REGISTRY[vendor];
+      const userMsg  = `Analyze this LinkedIn profile and return ONLY the JSON object:\n\n${text}`;
+
+      if (!apiKey) return showError('API token is required.');
+      if (!text)   return showError('Target profile input is empty.');
+
+      setLoading(true);
+
+      try {
+        let rawText = '';
+
+        /* ── Anthropic Messages API ──────────────────────────────── */
+        if (provider.protocol === 'anthropic') {
+          const res = await fetch(provider.endpoint, {
+            method: 'POST',
+            headers: {
+              'Content-Type':                              'application/json',
+              'x-api-key':                                 apiKey,
+              'anthropic-version':                         '2023-06-01',
+              'anthropic-dangerous-direct-browser-access': 'true'
+            },
+            body: JSON.stringify({
+              model,
+              max_tokens: 1500,
+              system:     MASTER_PROMPT,
+              messages: [{ role: 'user', content: userMsg }]
+            })
+          });
+          const d = await res.json();
+          if (d.error) throw new Error(`${d.error.type}: ${d.error.message}`);
+          rawText = d.content?.[0]?.text || '';
+        }
+
+        /* ── Google Gemini generateContent ───────────────────────── */
+        else if (provider.protocol === 'gemini') {
+          const url = `${provider.endpoint}${model}:generateContent?key=${apiKey}`;
+          const res = await fetch(url, {
+            method:  'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              systemInstruction: { parts: [{ text: MASTER_PROMPT }] },
+              contents: [{ parts: [{ text: userMsg }] }],
+              generationConfig: {
+                responseMimeType: 'application/json',
+                responseSchema:   GEMINI_SCHEMA,
+                temperature:      0.15
+              }
+            })
+          });
+          const d = await res.json();
+          if (d.error) throw new Error(`Gemini ${d.error.code}: ${d.error.message}`);
+          rawText = d.candidates?.[0]?.content?.parts?.[0]?.text || '';
+        }
+
+        /* ── OpenAI-compatible: OpenAI / DeepSeek / Kimi ─────────── */
+        else {
+          const res = await fetch(provider.endpoint, {
+            method:  'POST',
+            headers: {
+              'Content-Type':  'application/json',
+              'Authorization': `Bearer ${apiKey}`
+            },
+            body: JSON.stringify({
+              model,
+              response_format: { type: 'json_object' },
+              messages: [
+                { role: 'system', content: MASTER_PROMPT },
+                { role: 'user',   content: userMsg       }
+              ],
+              temperature: 0.15
+            })
+          });
+          const d = await res.json();
+          if (d.error) throw new Error(d.error.message || JSON.stringify(d.error));
+          rawText = d.choices?.[0]?.message?.content || '';
+        }
+
+        /* ── Parse JSON ───────────────────────────────────────────── */
+        const match = rawText.match(/\{[\s\S]*\}/);
+        if (!match) throw new Error('Model returned output with no parseable JSON payload.');
+        renderResults(JSON.parse(match[0]));
+
+      } catch (err) {
+        showError('Matrix Route Aborted: ' + err.message);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    /* ── Render Results ───────────────────────────────────────────*/
+    function renderResults(d) {
+      const score  = d.overallProbability || 0;
+      const color  = getScoreColor(score);
+      const threat = getThreatLevel(score);
+
+      const numEl = document.getElementById('scoreNum');
+      numEl.textContent = score + '%';
+      numEl.style.color = color;
+
+      setTimeout(() => {
+        const bar = document.getElementById('scoreBar');
+        bar.style.width      = score + '%';
+        bar.style.background = color;
+      }, 100);
+
+      document.getElementById('threatLevelContainer').innerHTML =
+        `<span class="threat-level ${threat.cls}">${threat.label}</span>`;
+      document.getElementById('justText').textContent = d.justificationSummary || '—';
+
+      const fw = d.frameworkWeighting || {};
+      const fs = d.frameworkScores    || {};
+      document.getElementById('miceScore').textContent   = fs.miceRascalScore     ?? '—';
+      document.getElementById('miceWeight').textContent  = (fw.miceRascalWeight   ?? '—') + '%';
+      document.getElementById('rigorScore').textContent  = fs.analyticRigorScore  ?? '—';
+      document.getElementById('rigorWeight').textContent = (fw.analyticRigorWeight ?? '—') + '%';
+      document.getElementById('opsecScore').textContent  = fs.opsecLeakyScore     ?? '—';
+      document.getElementById('opsecWeight').textContent = (fw.opsecLeakyWeight   ?? '—') + '%';
+
+      const pt = d.psychologicalTraits || {};
+      document.getElementById('tOpenness').textContent      = pt.opennessIntellect != null  ? pt.opennessIntellect  + '%' : '—';
+      document.getElementById('tConscientious').textContent = pt.conscientiousness  != null ? pt.conscientiousness   + '%' : '—';
+      document.getElementById('tStability').textContent     = pt.emotionalStability != null ? pt.emotionalStability  + '%' : '—';
+      document.getElementById('tComplexity').textContent    = pt.cognitiveComplexity || '—';
+
+      const tags = document.getElementById('intelTags');
+      tags.innerHTML = '';
+      (d.intelligenceTypesDetected || []).forEach(t => {
+        const span = document.createElement('span');
+        span.className   = 'intel-tag';
+        span.textContent = t;
+        tags.appendChild(span);
+      });
+
+      const tells = document.getElementById('tellsList');
+      tells.innerHTML = '';
+      (d.behavioralTells || []).forEach(t => {
+        const li = document.createElement('li');
+        li.innerHTML = `<span class="tell-arrow">▶</span><span>${t}</span>`;
+        tells.appendChild(li);
+      });
+
+      const rs = document.getElementById('resultsSection');
+      rs.style.display = 'block';
+      setTimeout(() => rs.scrollIntoView({ behavior: 'smooth', block: 'start' }), 80);
+    }
+
+    /* ── Keyboard shortcut: Ctrl/Cmd + Enter ─────────────────────*/
+    document.addEventListener('keydown', e => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') runAnalysis();
+    });
+
+    /* ── Init ────────────────────────────────────────────────────*/
+    buildVendorDropdown();
+    onVendorChange();
+  </script>
+</body>
+</html>
